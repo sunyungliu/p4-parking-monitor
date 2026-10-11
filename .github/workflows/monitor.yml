@@ -1,0 +1,46 @@
+name: P4 Parking Monitor
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p4-parking-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-parking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Download repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install browser tools
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Check October 29 availability
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python -u monitor.py
+
+      - name: Save diagnostic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4-diagnostics-${{ github.run_id }}
+          path: diagnostics/
+          retention-days: 1
+          if-no-files-found: ignore
