@@ -2,6 +2,8 @@ name: P4 Parking Monitor
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "2-57/5 * * * *"
 
 permissions:
   contents: read
@@ -37,7 +39,7 @@ jobs:
         run: python -u monitor.py
 
       - name: Save diagnostic screenshot
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: p4-diagnostics-${{ github.run_id }}
