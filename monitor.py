@@ -69,6 +69,8 @@ def send_notification():
 
 
 def main():
+    print("程式版本：v2－點擊同意文字")
+
     today = datetime.now(ZoneInfo("Asia/Taipei")).date()
     if today >= datetime.fromisoformat(TARGET_DATE).date():
         print("已到目標日期，停止查詢。")
@@ -86,37 +88,75 @@ def main():
         page.set_default_timeout(30000)
 
         try:
-            page.goto(START_URL, wait_until="domcontentloaded")
+            print("正在開啟 P4 優惠停車平台。")
+            page.goto(
+                START_URL,
+                wait_until="domcontentloaded",
+                timeout=60000,
+            )
 
-            # 依正常流程勾選須知，再進入日期列表。
-            page.get_by_role(
+            consent = page.get_by_role(
                 "checkbox",
                 name="本人已詳閱且同意上述須知規定",
                 exact=True,
-            ).check()
+            )
+            consent.wait_for(state="visible", timeout=60000)
+
+            # 等待目前存在的遮罩消失。
+            overlays = page.locator(".v-overlay--active")
+            for index in range(overlays.count()):
+                overlays.nth(index).wait_for(
+                    state="hidden",
+                    timeout=60000,
+                )
+
+            # 點擊文字標籤，避開勾選框上的視覺效果。
+            print("準備點擊同意文字。")
+            if not consent.is_checked():
+                page.get_by_text(
+                    "本人已詳閱且同意上述須知規定",
+                    exact=True,
+                ).click()
+
+            if not consent.is_checked():
+                raise RuntimeError(
+                    "點擊同意文字後仍未勾選。"
+                )
+
+            print("已成功勾選同意。")
 
             page.get_by_role(
-                "button", name="前往登記", exact=True
-            ).check(force=True)
+                "button",
+                name="前往登記",
+                exact=True,
+            ).click()
 
+            print("正在等待日期列表。")
             page.get_by_text(
-                "P4停車場 - 剩餘車位數", exact=True
-            ).wait_for(state="visible")
+                "P4停車場 - 剩餘車位數",
+                exact=True,
+            ).wait_for(state="visible", timeout=60000)
 
-            # 只判斷指定日期所在的表格列。
             row = page.locator("tr").filter(
                 has_text=TARGET_DATE
             )
-            row.wait_for(state="visible")
+            row.first.wait_for(
+                state="visible",
+                timeout=60000,
+            )
 
             if row.count() != 1:
-                raise RuntimeError("目標日期列不唯一，停止判斷。")
+                raise RuntimeError(
+                    "目標日期列不唯一，停止判斷。"
+                )
 
             status = row.inner_text()
             print(f"目標日期狀態：{status}")
 
             register = row.get_by_role(
-                "button", name="登記", exact=True
+                "button",
+                name="登記",
+                exact=True,
             )
 
             if "已滿" in status:
@@ -129,17 +169,22 @@ def main():
                 send_notification()
             else:
                 raise RuntimeError(
-                    "日期狀態無法辨識，不能當作已滿或有名額。"
+                    "日期狀態無法辨識，"
+                    "不能當作已滿或有名額。"
                 )
 
         except Exception:
-            print("查詢失敗，請查看執行紀錄及診斷截圖。")
+            print(f"失敗時所在頁面：{page.url}")
+            print(
+                "查詢失敗，請查看錯誤紀錄與診斷截圖。"
+            )
             raise
         finally:
             try:
                 page.screenshot(
                     path=str(ARTIFACTS / "page.png"),
                     full_page=True,
+                    timeout=15000,
                 )
             except Exception:
                 print("本次無法儲存診斷截圖。")
