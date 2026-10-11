@@ -97,7 +97,7 @@ def main():
 
             page.get_by_role(
                 "button", name="前往登記", exact=True
-            ).click()
+            ).check(force=True)
 
             page.get_by_text(
                 "P4停車場 - 剩餘車位數", exact=True
